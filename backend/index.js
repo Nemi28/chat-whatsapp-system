@@ -7,6 +7,8 @@ const bodyParser = require("body-parser");
 
 const sequelize = require("./config/database");
 const User = require("./models/User");
+const Message = require("./models/Message");
+const messageRoutes = require("./routes/message.routes");
 const authRoutes = require("./routes/auth.routes");
 
 dotenv.config();
@@ -21,10 +23,12 @@ const io = new Server(server, {
 
 // Middlewares
 app.use(cors());
+app.use("/uploads", express.static("uploads"));
 app.use(bodyParser.json());
 
 // Rutas
 app.use("/api/auth", authRoutes);
+app.use("/api/messages", messageRoutes);
 
 app.get("/", (req, res) => {
   res.send("Servidor backend funcionando");

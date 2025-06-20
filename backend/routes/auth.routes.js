@@ -3,6 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const verifyToken = require("../middlewares/authMiddleware");
 
 // Registro de usuario
 router.post("/register", async (req, res) => {
@@ -22,12 +23,10 @@ router.post("/register", async (req, res) => {
       password: hashedPassword,
     });
 
-    res
-      .status(201)
-      .json({
-        message: "Usuario registrado correctamente",
-        usuario: nuevoUsuario,
-      });
+    res.status(201).json({
+      message: "Usuario registrado correctamente",
+      usuario: nuevoUsuario,
+    });
   } catch (error) {
     res.status(500).json({ message: "Error al registrar", error });
   }
@@ -67,6 +66,14 @@ router.post("/login", async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Error al iniciar sesión", error });
   }
+});
+
+// Ruta protegida de prueba
+router.get("/perfil", verifyToken, async (req, res) => {
+  res.status(200).json({
+    message: "Acceso autorizado",
+    user: req.user, // contiene id y rol del token
+  });
 });
 
 module.exports = router;
