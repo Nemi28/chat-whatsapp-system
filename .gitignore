@@ -12,3 +12,9 @@ frontend/.env
 # IDEs
 .vscode/
 .idea/
+
+# Ignorar carpetas de archivos subidos
+/backend/uploads/
+/frontend/node_modules/
+/backend/node_modules/
+.env

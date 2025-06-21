@@ -6,8 +6,8 @@ const User = sequelize.define(
   {
     id: {
       type: DataTypes.INTEGER,
-      autoIncrement: true,
       primaryKey: true,
+      autoIncrement: true,
     },
     nombre: {
       type: DataTypes.STRING,
@@ -15,16 +15,12 @@ const User = sequelize.define(
     },
     email: {
       type: DataTypes.STRING,
-      unique: true,
       allowNull: false,
+      unique: true,
     },
     password: {
       type: DataTypes.STRING,
       allowNull: false,
-    },
-    rol: {
-      type: DataTypes.STRING,
-      defaultValue: "agente", // o "admin"
     },
   },
   {
@@ -32,5 +28,20 @@ const User = sequelize.define(
     timestamps: true,
   }
 );
+
+// ✅ Definir asociaciones
+User.associate = (models) => {
+  // Un usuario puede enviar muchos mensajes
+  User.hasMany(models.Message, {
+    foreignKey: "user_id",
+    as: "sentMessages",
+  });
+
+  // Un usuario puede recibir muchos mensajes
+  User.hasMany(models.Message, {
+    foreignKey: "receiver_id",
+    as: "receivedMessages",
+  });
+};
 
 module.exports = User;
