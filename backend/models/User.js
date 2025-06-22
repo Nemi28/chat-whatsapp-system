@@ -12,36 +12,65 @@ const User = sequelize.define(
     nombre: {
       type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        notEmpty: {
+          msg: "El nombre no puede estar vacío",
+        },
+        len: {
+          args: [2, 50],
+          msg: "El nombre debe tener entre 2 y 50 caracteres",
+        },
+      },
     },
     email: {
       type: DataTypes.STRING,
       allowNull: false,
-      unique: true,
+      unique: {
+        name: "unique_email",
+        msg: "Este email ya está registrado",
+      },
+      validate: {
+        isEmail: {
+          msg: "Debe ser un email válido",
+        },
+        notEmpty: {
+          msg: "El email no puede estar vacío",
+        },
+      },
     },
     password: {
       type: DataTypes.STRING,
       allowNull: false,
+      validate: {
+        notEmpty: {
+          msg: "La contraseña no puede estar vacía",
+        },
+        len: {
+          args: [6, 255],
+          msg: "La contraseña debe tener al menos 6 caracteres",
+        },
+      },
+    },
+    rol: {
+      type: DataTypes.ENUM("user", "admin"),
+      defaultValue: "user",
+    },
+    activo: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
     },
   },
   {
     tableName: "users",
     timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["email"],
+      },
+    ],
+    // ✅ REMOVER User.associate - Usaremos setupAssociations en index.js
   }
 );
-
-// ✅ Definir asociaciones
-User.associate = (models) => {
-  // Un usuario puede enviar muchos mensajes
-  User.hasMany(models.Message, {
-    foreignKey: "user_id",
-    as: "sentMessages",
-  });
-
-  // Un usuario puede recibir muchos mensajes
-  User.hasMany(models.Message, {
-    foreignKey: "receiver_id",
-    as: "receivedMessages",
-  });
-};
 
 module.exports = User;

@@ -3,12 +3,28 @@
     <!-- Menú lateral -->
     <aside class="w-64 bg-white shadow-lg p-4 flex flex-col justify-between">
       <div>
-        <h1 class="text-2xl font-bold text-indigo-600 mb-6">💬 Mi Chat</h1>
-        <nav class="space-y-2">
+        <h1 class="text-2xl font-bold text-indigo-600 mb-6">
+          💬 {{ config.appTitle || "Mi Chat" }}
+        </h1>
+
+        <!-- Loading de usuarios -->
+        <div v-if="loadingUsers" class="text-center py-4">
+          <div
+            class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600 mx-auto"
+          ></div>
+          <p class="text-sm text-gray-500 mt-2">Cargando chats...</p>
+        </div>
+
+        <!-- Lista de usuarios -->
+        <nav v-else class="space-y-2">
+          <div v-if="users.length === 0" class="text-center py-4 text-gray-500">
+            No hay conversaciones aún
+          </div>
+
           <button
             v-for="user in users"
             :key="user.id"
-            @click="selectUser(user)"
+            @click="handleSelectUser(user)"
             :class="[
               'w-full text-left px-4 py-2 rounded transition',
               selectedUser?.id === user.id
@@ -32,14 +48,15 @@
         </nav>
       </div>
 
+      <!-- Info del usuario actual -->
       <div class="text-sm text-gray-500 mt-6 border-t pt-4">
         <p class="mb-1">
           👤 Sesión:
           <span class="font-medium text-indigo-700">{{
-            currentUser?.nombre
+            currentUser?.nombre || "Usuario"
           }}</span>
         </p>
-        <button @click="logout" class="text-red-600 hover:underline">
+        <button @click="handleLogout" class="text-red-600 hover:underline">
           Cerrar sesión
         </button>
       </div>
@@ -47,6 +64,7 @@
 
     <!-- Panel de mensajes -->
     <main class="flex-1 flex flex-col relative">
+      <!-- Header del chat -->
       <header class="bg-white shadow p-4 border-b">
         <h2 class="text-xl font-semibold text-gray-800">
           {{
@@ -59,10 +77,12 @@
 
       <!-- Lista de mensajes -->
       <section
-        class="flex-1 overflow-y-auto px-4 py-6 bg-gray-50"
+        class="flex-1 overflow-y-auto px-4 py-6 bg-gray-50 messages-container"
         ref="messagesContainer"
+        @scroll="handleScroll"
       >
         <div v-if="selectedUser" class="space-y-3 max-w-2xl mx-auto">
+          <!-- Mensajes -->
           <div
             v-for="mensaje in mensajes"
             :key="mensaje.id"
@@ -81,6 +101,7 @@
               {{ mensaje.sender.nombre }}
             </div>
 
+            <!-- Contenido del mensaje -->
             <p
               v-if="mensaje.type === 'text'"
               class="whitespace-pre-wrap text-sm"
@@ -88,9 +109,10 @@
               {{ mensaje.content }}
             </p>
 
+            <!-- Imagen -->
             <div v-else-if="mensaje.type === 'image'">
               <img
-                :src="`http://localhost:3000/${mensaje.media_url}`"
+                :src="getMediaUrl(mensaje.media_url)"
                 :alt="mensaje.content || 'imagen'"
                 class="rounded-md w-40 shadow cursor-pointer"
                 @click="openImageModal(mensaje.media_url)"
@@ -98,10 +120,11 @@
               />
             </div>
 
+            <!-- Documento -->
             <div v-else-if="mensaje.type === 'document'">
               📎
               <a
-                :href="`http://localhost:3000/${mensaje.media_url}`"
+                :href="getMediaUrl(mensaje.media_url)"
                 target="_blank"
                 class="text-blue-600 underline hover:text-blue-800"
                 download
@@ -110,11 +133,12 @@
               </a>
             </div>
 
+            <!-- Audio -->
             <div v-else-if="mensaje.type === 'audio'">
               🎧
               <audio
                 controls
-                :src="`http://localhost:3000/${mensaje.media_url}`"
+                :src="getMediaUrl(mensaje.media_url)"
                 class="max-w-full"
                 @error="handleAudioError"
               />
@@ -128,17 +152,68 @@
             </div>
           </div>
 
-          <!-- Indicador de carga -->
+          <!-- Indicador de carga de mensajes -->
           <div v-if="loading" class="text-center py-4">
             <div
               class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"
             ></div>
+            <p class="text-sm text-gray-500 mt-2">Cargando mensajes...</p>
           </div>
         </div>
+
+        <!-- Mensaje de bienvenida -->
         <div v-else class="text-center text-gray-600 mt-10 text-lg">
           📨 Selecciona un contacto para empezar a chatear
         </div>
       </section>
+
+      <!-- Mostrar errores de validación -->
+      <div
+        v-if="validationErrors.length > 0"
+        class="bg-red-50 border-l-4 border-red-400 p-4 m-4"
+      >
+        <div class="flex">
+          <div class="flex-shrink-0">
+            <svg
+              class="h-5 w-5 text-red-400"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path
+                fill-rule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </div>
+          <div class="ml-3">
+            <h3 class="text-sm font-medium text-red-800">
+              Errores de validación
+            </h3>
+            <div class="mt-2 text-sm text-red-700">
+              <ul class="list-disc list-inside space-y-1">
+                <li v-for="error in validationErrors" :key="error">
+                  {{ error }}
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div class="ml-auto pl-3">
+            <button
+              @click="clearValidationErrors"
+              class="text-red-400 hover:text-red-600"
+            >
+              <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fill-rule="evenodd"
+                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- Previsualización antes de enviar -->
       <div
@@ -155,6 +230,18 @@
           🎤 Grabación lista:
           <audio :src="archivoPreview.url" controls class="ml-2" />
         </div>
+
+        <!-- Mostrar información del archivo validado -->
+        <div class="flex-1 text-sm text-gray-600">
+          <div v-if="fileValidationInfo">
+            <span class="text-green-600">✅ Archivo válido</span>
+            <div class="text-xs">
+              Tamaño: {{ fileValidationInfo.sizeFormatted }} | Tipo:
+              {{ fileValidationInfo.type }}
+            </div>
+          </div>
+        </div>
+
         <button @click="cancelarArchivo" class="text-red-500 hover:underline">
           Cancelar
         </button>
@@ -175,13 +262,13 @@
         </canvas>
         <div class="mt-2">
           <button
-            @click="detenerGrabacion"
+            @click="handleDetenerGrabacion"
             class="bg-red-500 text-white px-4 py-1 rounded"
           >
             Detener y Previsualizar
           </button>
           <button
-            @click="cancelarGrabacion"
+            @click="handleCancelarGrabacion"
             class="ml-2 text-gray-500 underline"
           >
             Cancelar
@@ -189,19 +276,47 @@
         </div>
       </div>
 
-      <!-- Campo de mensaje -->
+      <!-- Campo de mensaje con validaciones -->
       <form
         v-if="selectedUser"
-        @submit.prevent="enviar"
+        @submit.prevent="handleEnviar"
         class="bg-white border-t flex items-center gap-2 px-4 py-3"
       >
-        <input
-          v-model="nuevoMensaje"
-          type="text"
-          placeholder="Escribe un mensaje"
-          class="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-300"
-          :disabled="enviando"
-        />
+        <div class="flex-1 relative">
+          <input
+            v-model="nuevoMensaje"
+            type="text"
+            placeholder="Escribe un mensaje"
+            :class="[
+              'w-full px-4 py-2 border rounded-full focus:outline-none focus:ring-2 transition duration-200',
+              messageValidationError
+                ? 'border-red-300 focus:ring-red-400 bg-red-50'
+                : 'border-gray-300 focus:ring-indigo-300',
+            ]"
+            :disabled="enviando"
+            @input="validateMessage"
+            @blur="validateMessage"
+            :maxlength="1000"
+          />
+          <!-- Contador de caracteres -->
+          <div
+            v-if="nuevoMensaje.length > 800"
+            :class="[
+              'absolute right-3 top-1/2 transform -translate-y-1/2 text-xs',
+              nuevoMensaje.length > 1000 ? 'text-red-500' : 'text-orange-500',
+            ]"
+          >
+            {{ 1000 - nuevoMensaje.length }}
+          </div>
+
+          <!-- Error de mensaje -->
+          <div
+            v-if="messageValidationError"
+            class="absolute left-4 -bottom-6 text-xs text-red-500"
+          >
+            {{ messageValidationError }}
+          </div>
+        </div>
 
         <input
           type="file"
@@ -214,23 +329,30 @@
           type="button"
           @click="$refs.archivoInput.click()"
           :disabled="enviando"
-          class="p-2 hover:bg-gray-100 rounded"
+          class="p-2 hover:bg-gray-100 rounded transition duration-200"
+          title="Adjuntar archivo"
         >
           📎
         </button>
         <button
           type="button"
-          @click="grabarAudio"
+          @click="handleGrabarAudio"
           :disabled="enviando"
-          class="p-2 hover:bg-gray-100 rounded"
+          class="p-2 hover:bg-gray-100 rounded transition duration-200"
+          title="Grabar audio"
         >
           🎙️
         </button>
 
         <button
           type="submit"
-          :disabled="enviando || (!nuevoMensaje.trim() && !archivoFinal)"
-          class="bg-indigo-600 text-white px-4 py-2 rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          :disabled="enviando || !isMessageValid"
+          :class="[
+            'px-4 py-2 rounded-full transition duration-200',
+            enviando || !isMessageValid
+              ? 'bg-gray-400 text-white cursor-not-allowed opacity-50'
+              : 'bg-indigo-600 text-white hover:bg-indigo-700',
+          ]"
         >
           {{ enviando ? "Enviando..." : "Enviar" }}
         </button>
@@ -244,7 +366,7 @@
       @click="closeImageModal"
     >
       <img
-        :src="`http://localhost:3000/${imageModal}`"
+        :src="getMediaUrl(imageModal)"
         alt="Imagen ampliada"
         class="max-w-full max-h-full object-contain"
       />
@@ -253,181 +375,313 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, nextTick } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, computed, watch } from "vue";
 import { useRouter } from "vue-router";
-import axios from "axios";
-import { io } from "socket.io-client";
+import { useChat } from "@/composables/useChat.js";
+import { useAudio } from "@/composables/useAudio.js";
+import socketService from "@/services/socket.js";
+import { config } from "@/services/api.js";
 
-const socket = io("http://localhost:3000");
 const router = useRouter();
-const users = ref([]);
-const selectedUser = ref(null);
-const currentUser = ref(null);
-const mensajes = ref([]);
+
+// ============================================
+// VALIDACIONES INLINE (para no crear archivo separado)
+// ============================================
+const validateMessage = (content, hasFile = false) => {
+  const errors = [];
+
+  // Si no hay archivo, el contenido es obligatorio
+  if (!hasFile && (!content || content.trim().length === 0)) {
+    errors.push("Debe escribir un mensaje o adjuntar un archivo");
+    return { isValid: false, errors };
+  }
+
+  // Si hay contenido, validar longitud
+  if (content && content.trim().length > 1000) {
+    errors.push("El mensaje no puede exceder 1000 caracteres");
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    sanitized: content ? sanitizeText(content.trim()) : null,
+  };
+};
+
+const validateFile = (file) => {
+  const errors = [];
+
+  if (!file) {
+    return { isValid: true, errors: [] }; // Archivo opcional
+  }
+
+  const maxSize = 50 * 1024 * 1024; // 50MB
+  if (file.size > maxSize) {
+    errors.push(`El archivo es demasiado grande. Máximo permitido: 50MB`);
+  }
+
+  const allowedTypes = [
+    // Imágenes
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/gif",
+    "image/webp",
+    // Audio
+    "audio/mpeg",
+    "audio/mp3",
+    "audio/wav",
+    "audio/ogg",
+    "audio/webm",
+    "audio/aac",
+    "audio/m4a",
+    "audio/3gpp",
+    // Documentos
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "text/csv",
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    errors.push(
+      "Tipo de archivo no permitido. Solo se permiten imágenes, audio y documentos."
+    );
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    fileInfo: {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      sizeFormatted: formatFileSize(file.size),
+    },
+  };
+};
+
+const sanitizeText = (text) => {
+  if (!text) return "";
+
+  return text
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "") // Remover scripts
+    .replace(/<[^>]*>/g, "") // Remover tags HTML
+    .replace(/javascript:/gi, "") // Remover javascript:
+    .replace(/on\w+\s*=/gi, "") // Remover event handlers
+    .trim();
+};
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return "0 Bytes";
+
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
+// Composables
+const {
+  users,
+  selectedUser,
+  currentUser,
+  mensajes,
+  loading,
+  enviando,
+  allowedFileTypes,
+  initCurrentUser,
+  cargarUsuariosConMensajes,
+  selectUser,
+  scrollToBottom,
+  validateFile: originalValidateFile,
+  enviarMensaje,
+  setupSocketListeners,
+  cleanupSocketListeners,
+  formatTimestamp,
+  extractFileName,
+  getFileTypeText,
+  getMediaUrl,
+} = useChat();
+
+const {
+  grabando,
+  iniciarGrabacion,
+  detenerGrabacion,
+  cancelarGrabacion,
+  renderWaveform,
+  cleanup: cleanupAudio,
+  checkAudioSupport,
+} = useAudio();
+
+// Referencias locales
 const nuevoMensaje = ref("");
 const archivoInput = ref(null);
 const archivoPreview = ref(null);
 const archivoFinal = ref(null);
-const grabando = ref(false);
-const enviando = ref(false);
-const loading = ref(false);
-const mediaRecorder = ref(null);
-const audioChunks = ref([]);
-const waveformCanvas = ref(null);
-const audioContext = ref(null);
-const animationId = ref(null);
 const messagesContainer = ref(null);
+const waveformCanvas = ref(null);
 const imageModal = ref(null);
+const currentStream = ref(null);
+const loadingUsers = ref(true);
 
-// Tipos de archivo permitidos
-const allowedFileTypes = {
-  "image/jpeg": "image",
-  "image/jpg": "image",
-  "image/png": "image",
-  "image/gif": "image",
-  "audio/mp3": "audio",
-  "audio/wav": "audio",
-  "audio/webm": "audio",
-  "application/pdf": "document",
-  "application/msword": "document",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-    "document",
-  "text/plain": "document",
-};
+// ============================================
+// ESTADO DE VALIDACIONES
+// ============================================
+const validationErrors = ref([]);
+const messageValidationError = ref("");
+const fileValidationInfo = ref(null);
 
-const maxFileSize = 10 * 1024 * 1024; // 10MB
-
-const cargarUsuariosConMensajes = async () => {
-  const token = localStorage.getItem("token");
-  if (!token) {
-    router.push("/login");
-    return;
-  }
-
-  try {
-    const res = await axios.get(
-      "http://localhost:3000/api/messages/conversaciones/usuarios",
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    // Compatibilidad con ambos formatos de respuesta
-    if (res.data.success) {
-      users.value = res.data.data.usuarios || [];
-    } else {
-      users.value = res.data.usuarios || [];
+// ============================================
+// WATCHERS PARA AUTO-SCROLL
+// ============================================
+// Watcher para hacer scroll automático cuando cambien los mensajes
+watch(
+  () => mensajes.value,
+  (newMensajes, oldMensajes) => {
+    // Solo hacer scroll si hay mensajes y ha cambiado la lista
+    if (newMensajes && newMensajes.length > 0 && selectedUser.value) {
+      nextTick(() => {
+        setTimeout(() => {
+          scrollToBottomInstant(messagesContainer.value);
+          console.log("📜 Auto-scroll por cambio en mensajes");
+        }, 50);
+      });
     }
-  } catch (err) {
-    console.error("❌ Error al obtener usuarios:", err);
-    if (err.response?.status === 401) {
-      logout();
+  },
+  { deep: true }
+);
+
+// Watcher para hacer scroll cuando se selecciona un usuario diferente
+watch(
+  () => selectedUser.value,
+  (newUser, oldUser) => {
+    if (newUser && newUser.id !== oldUser?.id) {
+      console.log("👤 Usuario cambiado, preparando scroll...");
+      nextTick(() => {
+        setTimeout(() => {
+          scrollToBottomInstant(messagesContainer.value);
+          console.log("📜 Auto-scroll por cambio de usuario");
+        }, 100);
+
+        // Scroll adicional para asegurar
+        setTimeout(() => {
+          scrollToBottomSmooth(messagesContainer.value);
+        }, 400);
+      });
     }
   }
-};
+);
 
-const selectUser = async (user) => {
-  selectedUser.value = user;
-  loading.value = true;
+// ============================================
+// COMPUTED PROPERTIES
+// ============================================
+const isMessageValid = computed(() => {
+  const hasValidMessage =
+    nuevoMensaje.value.trim().length > 0 && !messageValidationError.value;
+  const hasValidFile = !!archivoFinal.value;
 
-  const token = localStorage.getItem("token");
-  try {
-    const res = await axios.get(
-      `http://localhost:3000/api/messages/${user.id}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+  return hasValidMessage || hasValidFile;
+});
 
-    // Compatibilidad con ambos formatos de respuesta
-    if (res.data.success) {
-      mensajes.value = res.data.data.mensajes || [];
-    } else {
-      mensajes.value = res.data.mensajes || [];
-    }
+// ============================================
+// MÉTODOS DE VALIDACIÓN
+// ============================================
+const validateMessageInput = () => {
+  const validation = validateMessage(nuevoMensaje.value, !!archivoFinal.value);
 
-    // Scroll al final después de cargar mensajes
-    await nextTick();
-    scrollToBottom();
-  } catch (err) {
-    console.error("❌ Error al obtener mensajes:", err);
-    if (err.response?.status === 401) {
-      logout();
-    }
-  } finally {
-    loading.value = false;
-  }
-};
-
-const scrollToBottom = () => {
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-  }
-};
-
-const extractFileName = (url) => {
-  return url.split("/").pop();
-};
-
-const getFileTypeText = (type) => {
-  switch (type) {
-    case "image":
-      return "🖼️ Imagen";
-    case "audio":
-      return "🎵 Audio";
-    case "document":
-      return "📄 Documento";
-    default:
-      return "📁 Archivo";
-  }
-};
-
-const formatTimestamp = (timestamp) => {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diffTime = Math.abs(now - date);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 1) {
-    return date.toLocaleTimeString("es-ES", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } else if (diffDays <= 7) {
-    return date.toLocaleDateString("es-ES", {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  if (!validation.isValid) {
+    messageValidationError.value = validation.errors[0];
   } else {
-    return date.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "2-digit",
-    });
+    messageValidationError.value = "";
+  }
+
+  return validation;
+};
+
+const clearValidationErrors = () => {
+  validationErrors.value = [];
+  messageValidationError.value = "";
+};
+
+// ============================================
+// MÉTODOS DE SCROLL MEJORADOS
+// ============================================
+const scrollToBottomSmooth = (container) => {
+  if (!container) return;
+
+  container.scrollTo({
+    top: container.scrollHeight,
+    behavior: "smooth",
+  });
+};
+
+const scrollToBottomInstant = (container) => {
+  if (!container) return;
+
+  container.scrollTop = container.scrollHeight;
+};
+
+const handleScroll = () => {
+  // Opcional: detectar si el usuario está cerca del final
+  const container = messagesContainer.value;
+  if (!container) return;
+
+  const isNearBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+  // Puedes usar esta información para mostrar un botón "ir abajo" si el usuario está arriba
+};
+
+// Manejo de selección de usuario
+const handleSelectUser = async (user) => {
+  try {
+    console.log("👤 Seleccionando usuario:", user.nombre);
+    clearValidationErrors(); // Limpiar errores al cambiar usuario
+
+    // Primero seleccionar el usuario (esto carga los mensajes)
+    await selectUser(user);
+
+    // Múltiples intentos de scroll para asegurar que funcione
+    await nextTick(); // Esperar actualización del DOM
+
+    setTimeout(() => {
+      scrollToBottomInstant(messagesContainer.value);
+      console.log("📜 Scroll inmediato a los últimos mensajes");
+    }, 50);
+
+    setTimeout(() => {
+      scrollToBottomSmooth(messagesContainer.value);
+      console.log("📜 Scroll suave de confirmación");
+    }, 300);
+  } catch (error) {
+    console.error("Error al seleccionar usuario:", error);
+    if (error.response?.status === 401) {
+      handleLogout();
+    }
   }
 };
 
-const validateFile = (file) => {
-  // Validar tipo de archivo
-  if (!allowedFileTypes[file.type]) {
-    throw new Error(`Tipo de archivo no permitido: ${file.type}`);
-  }
-
-  // Validar tamaño
-  if (file.size > maxFileSize) {
-    throw new Error(`El archivo es demasiado grande. Máximo 10MB permitido.`);
-  }
-
-  return true;
-};
-
+// Manejo de archivos con validación
 const handleArchivo = (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
   try {
-    validateFile(file);
+    const validation = validateFile(file);
+
+    if (!validation.isValid) {
+      validationErrors.value = validation.errors;
+      e.target.value = "";
+      return;
+    }
+
+    // Limpiar errores anteriores
+    clearValidationErrors();
+
+    // Guardar información de validación
+    fileValidationInfo.value = validation.fileInfo;
     archivoFinal.value = file;
 
     const fileType = allowedFileTypes[file.type];
@@ -451,253 +705,150 @@ const handleArchivo = (e) => {
       };
     }
   } catch (error) {
-    alert(error.message);
-    e.target.value = ""; // Limpiar input
+    validationErrors.value = [error.message];
+    e.target.value = "";
   }
 };
 
 const cancelarArchivo = () => {
   archivoPreview.value = null;
   archivoFinal.value = null;
+  fileValidationInfo.value = null;
+  clearValidationErrors();
+
   if (archivoInput.value) {
     archivoInput.value.value = "";
   }
 };
 
-const grabarAudio = async () => {
+// Manejo de grabación de audio
+const handleGrabarAudio = async () => {
+  if (!checkAudioSupport()) {
+    validationErrors.value = ["Tu navegador no soporta grabación de audio"];
+    return;
+  }
+
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder.value = new MediaRecorder(stream);
-    audioChunks.value = [];
+    clearValidationErrors();
+    const result = await iniciarGrabacion();
+    if (result.success) {
+      currentStream.value = result.stream;
+      await renderWaveform(result.stream, waveformCanvas);
+    }
+  } catch (error) {
+    validationErrors.value = [error.message];
+  }
+};
 
-    mediaRecorder.value.ondataavailable = (e) => {
-      audioChunks.value.push(e.data);
-    };
-
-    mediaRecorder.value.onstop = () => {
-      const blob = new Blob(audioChunks.value, { type: "audio/webm" });
-      const file = new File([blob], "grabacion.webm", { type: "audio/webm" });
-      archivoFinal.value = file;
+const handleDetenerGrabacion = async () => {
+  try {
+    const result = await detenerGrabacion();
+    if (result) {
+      archivoFinal.value = result.file;
       archivoPreview.value = {
         type: "audio",
-        url: URL.createObjectURL(blob),
-        name: "grabacion.webm",
+        url: result.url,
+        name: result.name,
       };
-      grabando.value = false;
 
-      // Limpiar recursos de audio
-      if (audioContext.value) {
-        audioContext.value.close();
-        audioContext.value = null;
+      // Validar el archivo de audio generado
+      const validation = validateFile(result.file);
+      if (validation.isValid) {
+        fileValidationInfo.value = validation.fileInfo;
       }
-      if (animationId.value) {
-        cancelAnimationFrame(animationId.value);
-        animationId.value = null;
-      }
+    }
 
-      // Detener todas las pistas del stream
-      stream.getTracks().forEach((track) => track.stop());
-    };
-
-    grabando.value = true;
-    mediaRecorder.value.start();
-
-    // Esperar a que el DOM se actualice antes de renderizar
-    await nextTick();
-    renderWaveform(stream);
+    // Detener stream
+    if (currentStream.value) {
+      currentStream.value.getTracks().forEach((track) => track.stop());
+      currentStream.value = null;
+    }
   } catch (error) {
-    console.error("❌ Error al grabar audio:", error);
-    alert("Error al acceder al micrófono. Verifica los permisos.");
-    grabando.value = false;
+    console.error("Error al detener grabación:", error);
+    validationErrors.value = ["Error al procesar la grabación"];
   }
 };
 
-const detenerGrabacion = () => {
-  if (mediaRecorder.value && mediaRecorder.value.state === "recording") {
-    mediaRecorder.value.stop();
+const handleCancelarGrabacion = () => {
+  cancelarGrabacion();
+  cancelarArchivo();
+
+  // Detener stream
+  if (currentStream.value) {
+    currentStream.value.getTracks().forEach((track) => track.stop());
+    currentStream.value = null;
   }
 };
 
-const cancelarGrabacion = () => {
-  if (mediaRecorder.value && mediaRecorder.value.state === "recording") {
-    mediaRecorder.value.stop();
-  }
-
-  grabando.value = false;
-  archivoPreview.value = null;
-  archivoFinal.value = null;
-
-  // Limpiar recursos
-  if (audioContext.value) {
-    audioContext.value.close();
-    audioContext.value = null;
-  }
-  if (animationId.value) {
-    cancelAnimationFrame(animationId.value);
-    animationId.value = null;
-  }
-};
-
-const renderWaveform = (stream) => {
-  if (!waveformCanvas.value) {
-    console.error("❌ Canvas no encontrado");
-    return;
-  }
-
-  try {
-    audioContext.value = new (window.AudioContext ||
-      window.webkitAudioContext)();
-    const source = audioContext.value.createMediaStreamSource(stream);
-    const analyser = audioContext.value.createAnalyser();
-    source.connect(analyser);
-
-    analyser.fftSize = 256;
-    const bufferLength = analyser.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const canvas = waveformCanvas.value;
-    const ctx = canvas.getContext("2d");
-
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * 2;
-    canvas.height = rect.height * 2;
-    ctx.scale(2, 2);
-
-    const draw = () => {
-      if (!grabando.value) return;
-
-      animationId.value = requestAnimationFrame(draw);
-      analyser.getByteFrequencyData(dataArray);
-
-      ctx.clearRect(0, 0, canvas.width / 2, canvas.height / 2);
-      ctx.fillStyle = "#6366F1";
-
-      const barWidth = canvas.width / 2 / bufferLength;
-
-      dataArray.forEach((val, i) => {
-        const barHeight = (val / 255) * (canvas.height / 4);
-        ctx.fillRect(
-          i * barWidth,
-          canvas.height / 4 - barHeight,
-          barWidth - 1,
-          barHeight
-        );
-      });
-    };
-
-    draw();
-  } catch (error) {
-    console.error("❌ Error al inicializar waveform:", error);
-  }
-};
-
-const enviar = async () => {
-  const token = localStorage.getItem("token");
-
-  if (!token) {
-    console.error("❌ No hay token de autenticación");
-    router.push("/login");
-    return;
-  }
-
+// Manejo de envío de mensajes con validación
+const handleEnviar = async () => {
   if (!selectedUser.value) {
-    console.error("❌ No hay usuario seleccionado");
+    validationErrors.value = ["No hay usuario seleccionado"];
     return;
   }
 
-  // Validar que hay contenido para enviar
-  if (!archivoFinal.value && !nuevoMensaje.value.trim()) {
-    console.log("⚠️ No hay contenido para enviar");
+  // Validar mensaje antes del envío
+  const messageValidation = validateMessageInput();
+
+  if (!messageValidation.isValid && !archivoFinal.value) {
+    validationErrors.value = messageValidation.errors;
     return;
   }
-
-  enviando.value = true;
 
   try {
-    const formData = new FormData();
-    formData.append("receiver_id", selectedUser.value.id.toString());
+    clearValidationErrors();
+    const messageData = {};
 
     if (archivoFinal.value) {
-      // Validar archivo antes de enviar
-      validateFile(archivoFinal.value);
-      formData.append("archivo", archivoFinal.value);
-      console.log("📎 Enviando archivo:", {
-        name: archivoFinal.value.name,
-        type: archivoFinal.value.type,
-        size: archivoFinal.value.size,
-      });
+      messageData.archivo = archivoFinal.value;
     } else if (nuevoMensaje.value.trim()) {
-      formData.append("type", "text");
-      formData.append("content", nuevoMensaje.value.trim());
-      console.log("📝 Enviando texto:", nuevoMensaje.value);
+      messageData.type = "text";
+      messageData.content = messageValidation.sanitized; // Usar contenido sanitizado
     }
 
-    const res = await axios.post(
-      "http://localhost:3000/api/messages",
-      formData,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-        timeout: 30000,
-      }
-    );
+    console.log("📤 Enviando mensaje:", messageData);
+    await enviarMensaje(messageData);
 
-    console.log("✅ Respuesta del servidor:", res.data);
+    // Limpiar formulario
+    nuevoMensaje.value = "";
+    cancelarArchivo();
 
-    // Compatibilidad con ambos formatos de respuesta
-    let nuevoMensajeData;
-    if (res.data.success) {
-      nuevoMensajeData = res.data.data;
-    } else {
-      nuevoMensajeData = res.data.data;
-    }
+    // Scroll al final y actualizar lista de usuarios
+    await nextTick();
+    scrollToBottom(messagesContainer.value);
+    await cargarUsuariosConMensajes();
 
-    if (nuevoMensajeData) {
-      // Verificar si el mensaje ya existe (evitar duplicados)
-      const exists = mensajes.value.some((m) => m.id === nuevoMensajeData.id);
-      if (!exists) {
-        mensajes.value.push(nuevoMensajeData);
-        await nextTick();
-        scrollToBottom();
-      }
-
-      // Limpiar formulario
-      nuevoMensaje.value = "";
-      cancelarArchivo();
-
-      console.log("✅ Mensaje enviado correctamente");
-    } else {
-      console.warn("⚠️ Respuesta inesperada del servidor:", res.data);
-    }
-  } catch (err) {
-    console.error("❌ Error al enviar mensaje:", err);
+    console.log("✅ Mensaje enviado correctamente");
+  } catch (error) {
+    console.error("❌ Error al enviar mensaje:", error);
 
     let errorMessage = "Error al enviar mensaje";
-
-    if (err.response) {
-      console.error("📊 Status:", err.response.status);
-      console.error("💬 Data:", err.response.data);
-
-      if (err.response.status === 401) {
-        logout();
+    if (error.response) {
+      if (error.response.status === 401) {
+        handleLogout();
+        return;
+      } else if (error.response.status === 400) {
+        // Error de validación del servidor
+        const serverErrors = error.response.data?.errors || [];
+        if (serverErrors.length > 0) {
+          validationErrors.value = serverErrors.map((err) => err.message);
+        } else {
+          validationErrors.value = [
+            error.response.data?.message || errorMessage,
+          ];
+        }
         return;
       }
-
-      errorMessage = err.response.data?.message || errorMessage;
-    } else if (err.request) {
-      errorMessage = "Error de conexión";
-    } else if (err.message) {
-      errorMessage = err.message;
+      errorMessage = error.response.data?.message || errorMessage;
+    } else if (error.message) {
+      errorMessage = error.message;
     }
 
-    alert(errorMessage);
-  } finally {
-    enviando.value = false;
+    validationErrors.value = [errorMessage];
   }
 };
 
+// Manejo de errores de medios
 const handleImageError = (event) => {
   console.error("Error al cargar imagen:", event.target.src);
   event.target.style.display = "none";
@@ -707,6 +858,7 @@ const handleAudioError = (event) => {
   console.error("Error al cargar audio:", event.target.src);
 };
 
+// Modal de imágenes
 const openImageModal = (imageUrl) => {
   imageModal.value = imageUrl;
 };
@@ -715,68 +867,73 @@ const closeImageModal = () => {
   imageModal.value = null;
 };
 
-const logout = () => {
+// Manejo de logout
+const handleLogout = () => {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+  socketService.disconnect();
   router.push("/login");
 };
 
-onMounted(() => {
-  const stored = localStorage.getItem("user");
-  if (stored) {
-    try {
-      currentUser.value = JSON.parse(stored);
-      cargarUsuariosConMensajes();
+// Ciclo de vida del componente
+onMounted(async () => {
+  console.log("🚀 Iniciando ChatView...");
 
-      // Unirse a su canal privado
-      socket.emit("join", `user_${currentUser.value.id}`);
-
-      // Escuchar nuevos mensajes
-      socket.on("nuevo_mensaje", (mensaje) => {
-        console.log("📨 Nuevo mensaje recibido:", mensaje);
-
-        // Mostrar solo si estamos chateando con ese usuario
-        if (
-          selectedUser.value &&
-          (mensaje.user_id === selectedUser.value.id ||
-            mensaje.receiver_id === selectedUser.value.id)
-        ) {
-          // Evitar duplicados
-          const exists = mensajes.value.some((m) => m.id === mensaje.id);
-          if (!exists) {
-            mensajes.value.push(mensaje);
-            nextTick(() => scrollToBottom());
-          }
-        }
-
-        // Actualizar lista de usuarios si es necesario
-        cargarUsuariosConMensajes();
-      });
-
-      // Escuchar mensajes eliminados
-      socket.on("mensaje_eliminado", (data) => {
-        mensajes.value = mensajes.value.filter((m) => m.id !== data.messageId);
-      });
-    } catch (error) {
-      console.error("Error al parsear usuario:", error);
-      logout();
-    }
-  } else {
+  // Inicializar usuario actual
+  if (!initCurrentUser()) {
+    console.log("❌ No hay usuario logueado");
     router.push("/login");
+    return;
+  }
+
+  console.log("✅ Usuario actual:", currentUser.value);
+
+  try {
+    // Conectar socket
+    socketService.connect();
+
+    // Cargar datos iniciales
+    console.log("📡 Cargando usuarios y conversaciones...");
+    loadingUsers.value = true;
+    await cargarUsuariosConMensajes();
+    loadingUsers.value = false;
+
+    console.log("✅ Usuarios cargados:", users.value.length);
+
+    // Configurar listeners de socket
+    setupSocketListeners();
+
+    console.log("✅ Chat inicializado correctamente");
+  } catch (error) {
+    console.error("❌ Error al inicializar chat:", error);
+    loadingUsers.value = false;
+
+    if (error.response?.status === 401) {
+      handleLogout();
+    } else {
+      validationErrors.value = [
+        "Error al cargar el chat. Intenta recargar la página.",
+      ];
+    }
   }
 });
 
 onUnmounted(() => {
-  socket.off("nuevo_mensaje");
-  socket.off("mensaje_eliminado");
+  console.log("🧹 Limpiando ChatView...");
+
+  // Limpiar listeners
+  cleanupSocketListeners();
 
   // Limpiar recursos de audio
-  if (audioContext.value) {
-    audioContext.value.close();
+  cleanupAudio();
+
+  // Detener stream si existe
+  if (currentStream.value) {
+    currentStream.value.getTracks().forEach((track) => track.stop());
   }
-  if (animationId.value) {
-    cancelAnimationFrame(animationId.value);
-  }
+
+  // Desconectar socket
+  socketService.disconnect();
 });
 </script>
 
@@ -797,5 +954,9 @@ canvas {
   to {
     transform: rotate(360deg);
   }
+}
+
+.messages-container {
+  scroll-behavior: smooth;
 }
 </style>
