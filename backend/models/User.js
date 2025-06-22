@@ -38,6 +38,27 @@ const User = sequelize.define(
         },
       },
     },
+    phone: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: {
+        name: "unique_phone",
+        msg: "Este número ya está registrado",
+      },
+      validate: {
+        notEmpty: {
+          msg: "El número de teléfono no puede estar vacío",
+        },
+        len: {
+          args: [8, 20],
+          msg: "El teléfono debe tener entre 8 y 20 caracteres",
+        },
+        is: {
+          args: /^[0-9\+]+$/i,
+          msg: "El teléfono solo debe contener números o el símbolo '+'",
+        },
+      },
+    },
     password: {
       type: DataTypes.STRING,
       allowNull: false,

@@ -499,6 +499,36 @@ router.post(
 
       const nuevoMensaje = await Message.create(mensaje);
 
+      // ✅ Si el receptor respondió por primera vez a un número externo (receiver_id viene del frontend)
+      if (mensaje.receiver_id && mensaje.receiver_id !== req.user.id) {
+        const emisorId = mensaje.user_id;
+
+        // Buscar mensajes anteriores sin asignar operador (receiver_id = null)
+        const mensajesSinAsignar = await Message.findAll({
+          where: {
+            user_id: emisorId,
+            receiver_id: null,
+          },
+        });
+
+        // Asignar receiver_id actual a todos los mensajes anteriores de ese contacto
+        if (mensajesSinAsignar.length > 0) {
+          await Message.update(
+            { receiver_id: mensaje.receiver_id },
+            {
+              where: {
+                user_id: emisorId,
+                receiver_id: null,
+              },
+            }
+          );
+
+          console.log(
+            `🔄 Se asignó receiver_id=${mensaje.receiver_id} a ${mensajesSinAsignar.length} mensajes anteriores.`
+          );
+        }
+      }
+
       // Incluir información del remitente en la respuesta
       const mensajeCompleto = await Message.findByPk(nuevoMensaje.id, {
         include: [

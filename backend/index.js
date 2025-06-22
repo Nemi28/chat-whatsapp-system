@@ -198,6 +198,12 @@ app.use((req, res, next) => {
   }
 });
 
+// ✅ Webhook WhatsApp: usar raw para Meta antes de express.json
+//const bodyParser = require("body-parser");
+//app.use("/webhook/whatsapp", bodyParser.raw({ type: "application/json" }));
+//app.use("/webhook/whatsapp", express.raw({ type: "application/json" }));
+//app.use(bodyParser.json());
+//app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -255,6 +261,14 @@ try {
   console.log("✅ Message routes cargadas");
 } catch (error) {
   console.error("❌ Error cargando message routes:", error);
+  process.exit(1);
+}
+try {
+  const webhookRoutes = require("./routes/webhook.routes");
+  app.use("/webhook/whatsapp", webhookRoutes);
+  console.log("✅ Webhook routes cargadas");
+} catch (error) {
+  console.error("❌ Error cargando webhook routes:", error);
   process.exit(1);
 }
 

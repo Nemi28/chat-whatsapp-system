@@ -29,7 +29,7 @@ const Message = sequelize.define(
     },
     receiver_id: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
       references: {
         model: "users",
         key: "id",
@@ -37,9 +37,6 @@ const Message = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
       validate: {
-        notNull: {
-          msg: "receiver_id es requerido",
-        },
         isInt: {
           msg: "receiver_id debe ser un número entero",
         },
